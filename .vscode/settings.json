@@ -1,0 +1,8 @@
+{
+    "deveco-debug.prefer-template": "hi3861@sample",
+    "files.associations": {
+        "aiot_state_api.h": "c",
+        "math.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
+}
