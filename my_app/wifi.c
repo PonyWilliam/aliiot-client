@@ -19,7 +19,7 @@ extern int aiotMqttSign(const char *productKey, const char *deviceName, const ch
                      	char clientId[150], char username[65], char password[65]);
 
 volatile int toStop = 0;
-
+int msgid = 0;
 void cfinish(int sig)
 {
     sig = sig;
@@ -30,31 +30,50 @@ void cfinish(int sig)
 void messageArrived(MessageData* md)
 {
 	MQTTMessage* message = md->message;
-    char *res1 = "open";
-    char *res2 = "close";
+    char *res1 = "open";//正转
+    char *res2 = "close";//关闭电机
+	char *res3 = "reverse";//反转
 	printf("%.*s\t", md->topicName->lenstring.len, md->topicName->lenstring.data);
 	printf("%.*s\n", (int)message->payloadlen, (char*)message->payload);
 	printf("base64:%s\n",my_encode((char*)message->payload));
     if(memcmp(message->payload,res1,(int)message->payloadlen) == 0){
         printf("open\n");
         GpioSetOutputVal(WIFI_IOT_GPIO_IDX_2, 1);//打开小灯
-        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_8, 1);//打开电机
-        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_4, 1);//打开电机
-        //开发电机
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_7, 1);//打开电机
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_8, 0);//打开电机，并且正转
+
+
+		MQTTMessage msg = {
+			QOS1, 
+			0,
+			0,
+			0,
+			"open",
+			strlen("open"),
+		};
+        msg.id = ++msgid;
+		int rc = MQTTPublish(&c, pubTopic, &msg);
+		printf("MQTTPublish %d, msgid %d\n", rc, msgid);
+
     }else if(memcmp(message->payload,res2,(int)message->payloadlen) == 0){
         printf("close\n");
         //关发电机
-        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_2, 0);//关闭小灯
-        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_4, 0);//关闭电机
-        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_8, 0);//打开电机
-    }
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_2, 0);
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_7, 0);
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_8, 0);
+    }else if(memcmp(message->payload,res3,(int)message->payloadlen) == 0){
+		printf("reverse\n");
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_2, 1);//打开小灯
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_7, 0);//打开电机
+        GpioSetOutputVal(WIFI_IOT_GPIO_IDX_8, 1);//打开电机，并且反转
+	}
 }
 
 /* main function */
 static void MQTT_DemoTask(void)
 {
     GpioInit();
-
+	//说明:GPIO2控制小灯，GPIO7正转，GPIO8反转
     //设置GPIO_2的复用功能为普通GPIO
     IoSetFunc(WIFI_IOT_IO_NAME_GPIO_2, WIFI_IOT_IO_FUNC_GPIO_2_GPIO);
 
@@ -65,11 +84,11 @@ static void MQTT_DemoTask(void)
 
     //设置GPIO_10为输出模式
     GpioSetDir(WIFI_IOT_GPIO_IDX_8, WIFI_IOT_GPIO_DIR_OUT);
-    //设置GPIO_10的复用功能为普通GPIO
-    IoSetFunc(WIFI_IOT_IO_NAME_GPIO_4, WIFI_IOT_IO_FUNC_GPIO_4_GPIO);
+    //设置GPIO_7的复用功能为普通GPIO
+    IoSetFunc(WIFI_IOT_IO_NAME_GPIO_7, WIFI_IOT_IO_FUNC_GPIO_7_GPIO);
 
-    //设置GPIO_10为输出模式
-    GpioSetDir(WIFI_IOT_GPIO_IDX_4, WIFI_IOT_GPIO_DIR_OUT);
+    //设置GPIO_7为输出模式
+    GpioSetDir(WIFI_IOT_GPIO_IDX_7, WIFI_IOT_GPIO_DIR_OUT);
     //初始化外设
 
     GpioSetOutputVal(WIFI_IOT_GPIO_IDX_2, 0);//关闭小灯
